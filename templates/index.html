@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas Example</title>
+    <style>
+        canvas {
+            border: 1px solid black;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="myCanvas" width="500" height="500" oncontextmenu="return false;"></canvas>
+
+</body>
+
+<script>
+    const url = 'http://127.0.0.1:5000';
+
+    // Get the canvas element and its 2d rendering context
+    const canvas = document.getElementById('myCanvas');
+    const ctx = canvas.getContext('2d');
+    
+
+    // Draw a blue square on the canvas
+    ctx.fillStyle = 'blue'; // Set the fill color to blue
+    ctx.fillRect(50, 50, 100, 100); // Draw a square at (50, 50) with a width and height of 100 pixels
+
+
+
+</script>
+<script src="{{url_for('static', filename='scripts/script.js')}}"></script>
+<style>
+    body {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh; /* Ensure the body takes up the full viewport height */
+        margin: 0; /* Remove default margin */
+    }
+
+    canvas {
+        border: 1px solid black;
+        /* Add any additional styles for your canvas */
+    }
+</style>
+</html>
