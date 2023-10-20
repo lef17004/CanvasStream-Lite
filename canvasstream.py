@@ -1,8 +1,8 @@
 from flask import Flask, render_template, url_for, request
 from markupsafe import escape
-from src.main import CanvasStreamController
+from src.main import Main
 
-controllers = {}
+applications = {}
 
 app = Flask(__name__)
 
@@ -10,35 +10,22 @@ app = Flask(__name__)
 def main():
     return render_template("index.html")
 
-@app.route("/connect")
-def connect():
-    global controllers
-    new_controller = CanvasStreamController()
-    session_key = new_controller.on_connect()
-    controllers[session_key] = new_controller
-    return {
-        "sessionKey": session_key,
-    }
-
-@app.route("/setup/<session_key>", methods=['POST'])
-def setup(session_key):
+@app.route("/setup/", methods=['POST'])
+def setup():
     # print(request.get_json())
+    setup_info = request.get_json()
+    main = Main()
+    response = main.setup(setup_info)
+    session_key = str(response['sessionkey'])
+    applications[session_key] = main
     print(session_key)
-    setup_info = controllers[session_key].on_setup(request.get_json())
-    return setup_info
-
-@app.route("/preloadAssets/<session_key>", methods=['POST'])
-def preload_assets(session_key):
-    return {}
-
-@app.route("/canvas/<session_key>")
-def canvas(session_key):
-    return {}
+    return response
 
 @app.route("/event/<session_key>", methods=['POST'])
 def event(session_key):
-    print(request.get_json())
-    return {}
+    
+    response = applications[str(session_key)].loop(request.get_json())
+    return response
 
 @app.route("/disconnect/<session_key>")
 def disconnect(session_key):

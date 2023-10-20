@@ -1,29 +1,63 @@
 import random
 
-class CanvasStreamController:
+class Main:
     def __init__(self):
-        self.sessionKey = str(random.randint(1, 100))
-        self.screen_info = None
+        self._sessionKey = str(random.randint(1, 100))
+        self._width = 500
+        self._height = 500
 
-    def on_connect(self):
-        return self.sessionKey
-
-    def on_setup(self, screen_info):
-        self.screen_info = screen_info
-        print(screen_info)
-        return {
-            "width": 1000,
-            "height": 1000
+    def setup(self, setup_info):
+        print('Setup')
+        response = {
+            'sessionkey' : self._sessionKey,
+            'width': self._width,
+            "height": self._height,
+            "listeners": [
+                "click",
+                # "keydown",
+                # "dblclick",
+                # "mousedown",
+                # "mouseup",
+                # "mousemove",
+                # "touchstart",
+                # "touchmove",
+                # "touchend",
+                # "touchcancel",
+                # "keydown",
+                # "keyup",
+                # "load",
+                # "unload",
+                # "resize"
+            ]
         }
 
-    def on_preload(self):
-        ...
+        return response
+    
+    def loop(self, event):
+        time = event['time']
+        events = event['events']
+        response = []
 
-    def on_event(self):
-        ...
+        print(event)
+        
 
-    def on_draw(self):
-        ...
+        for e in events:
+            print(events)
+            response.append({
+                'type': 'var',
+                'name': 'fillStyle',
+                'parameters': ['blue']
+                })
+            response.append({
+                'type': 'func',
+                'name': "fillRect",
+                'parameters': [e['x'], e['y'], 50, 50]
+            })
+        
 
-    def on_disconnect(self):
-        ...
+        return response
+    
+    def error(self, client_error):
+        response = {}
+
+        return response
