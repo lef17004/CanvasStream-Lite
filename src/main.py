@@ -51,7 +51,7 @@ class Main:
             response.append({
                 'type': 'func',
                 'name': "fillRect",
-                'parameters': [e['x'], e['y'], 50, 50]
+                'parameters': [e['x'], e['y'], 10, 10]
             })
         
 
