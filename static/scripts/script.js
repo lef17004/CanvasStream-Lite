@@ -1,3 +1,8 @@
+////////////////////////////////////////////////////////////////////////////////
+/// Main
+/// Mostly exists to avoid having global variables
+/// Contains the data and methods that make CanvasStream function
+////////////////////////////////////////////////////////////////////////////////
 class Main {
     ////////////////////////////////////////////////////////////////////////////
     /// Constructor
@@ -93,7 +98,6 @@ class Main {
         if (xhr.status === 200) {
             // Request was successful
             var responseText = xhr.responseText;
-            //console.log('POST Response:', responseText);
             return JSON.parse(responseText);
         } else {
             // Request failed
@@ -129,11 +133,8 @@ class Main {
     
         // Send the POST request (blocking)
         const response = this.sendRequest(type, path, payload);
-        console.log(response);
         this.processInstructions(response);
 
-        
-        
         this.time++;
         this.events = [];
     }
