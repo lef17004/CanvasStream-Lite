@@ -1,61 +1,271 @@
-let events = [];
-let sessionKey = "";
-let time = 0;
+class Main {
+    ////////////////////////////////////////////////////////////////////////////
+    /// Constructor
+    /// Execution begins here
+    ////////////////////////////////////////////////////////////////////////////
+    constructor() {
+        this.events = [];
+        this.sessionKey = "";
+        this.time = "";
+        this.canvas = document.getElementById("myCanvas")
+        this.ctx = this.canvas.getContext("2d");
+        this.framesPerSecond = 1000 / 30;
 
+        this.setup();
+        this.startEventLoop();
+    }
 
-function main() {
-    const setupResponse = setup();
-    sessionKey = setupResponse.sessionkey;
-    addEventListeners(setupResponse.listeners);
-    console.log(setupResponse);
-    eventLoop();
-    //window.requestAnimationFrame(eventLoop);
-}
+    ////////////////////////////////////////////////////////////////////////////
+    /// Setup
+    /// Makes the initial connection to the server. Sets up the client to the
+    /// initial starting state.
+    ////////////////////////////////////////////////////////////////////////////
+    setup() {
+        const path = "/setup/";
+        const type = "POST";
+        const payload = {
+            width: window.innerWidth,
+            height: window.innerHeight,
+            orientation: getOrientation()
+        }
+        
+        const instructions = this.sendRequest(type, path, payload);
+        this.processInstructions(instructions)
+    }
 
-function advance() {
-    const path = "/event/" + sessionKey;
-    // Create a new XMLHttpRequest object
-    var xhr = new XMLHttpRequest();
-
-    // Configure the POST request
-    xhr.open('POST', path, false); // Set the third parameter to true for asynchronous
-
-    // Set the content type header
-    xhr.setRequestHeader('Content-Type', 'application/json');
+    ////////////////////////////////////////////////////////////////////////////
+    /// ProcessInstructions
+    /// Executes the given instructions
+    ///
+    /// Parameters
+    ///     instructions: Array[jsonObject]
+    ///         An array of jsonObjects each with a type, name, and parameters
+    ///         type: String, name: String, parameters: Array[String]
+    ////////////////////////////////////////////////////////////////////////////
+    processInstructions(instructions) {
+        for (const instruction of instructions) {
+            const type = instruction.type;
+            const name = instruction.name;
+            const parameters = instruction.parameters;
     
-    // Data to be sent in the POST request (replace with your own data)
-    var postData = JSON.stringify({
-        events: events,
-        time: time
-    });
+            if (type == "func") {
+                this.ctx[name].apply(this.ctx, parameters);
+            } else if (type == "var") {
+                this.ctx[name] = parameters[0];
+            } else if (type == "command") {
+                if (name == "setWidth") {
+                    this.canvas.width = parseInt(parameters[0]);
+                } else if (name == "setHeight") {
+                    this.canvas.height = parseInt(parameters[0]);
+                } else if (name == "setSessionKey") {
+                    this.sessionKey = parameters[0]
+                } else if (name == "setListeners") {
+                    this.registerEventListeners(parameters[0]);
+                }
+            }
+        }
+    }
 
-    // Send the POST request (blocking)
-    xhr.send(postData);
-    time++;
+    ////////////////////////////////////////////////////////////////////////////
+    /// SendRequest
+    /// Sends a request to the server 
+    /// 
+    /// Parameters
+    ///     type: String 
+    ///         Type of http request to make (GET, POST, etc)
+    ///     path: String
+    ///         Url to send reques to
+    ///     payload: jsonObject
+    ///         JSON to send to the server
+    ///
+    /// Returns
+    ///     jsonObject
+    ///         A json object recieved from the server. Will be null if failed 
+    ////////////////////////////////////////////////////////////////////////////
+    sendRequest(type, path, payload) {
+        var xhr = new XMLHttpRequest();
+        xhr.open(type, path, false); // Set the third parameter to true for asynchronous
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        var postData = JSON.stringify(payload);
+        xhr.send(postData);
 
-    events = [];
+        // Check the response status
+        if (xhr.status === 200) {
+            // Request was successful
+            var responseText = xhr.responseText;
+            //console.log('POST Response:', responseText);
+            return JSON.parse(responseText);
+        } else {
+            // Request failed
+            console.error('POST Request failed with status:', xhr.status);
+            return null;
+        }
+    }
 
-    // Check the response status
-    if (xhr.status === 200) {
-        // Request was successful
-        var responseText = xhr.responseText;
-        draw(JSON.parse(responseText));
-        return responseText;
-    } else {
-        // Request failed
-        console.error('POST Request failed with status:', xhr.status);
-        return responseText
+    ////////////////////////////////////////////////////////////////////////////
+    /// StartEventLoop
+    /// Starts the event loop. Calls handle events for each frame. 
+    ////////////////////////////////////////////////////////////////////////////
+    startEventLoop() {
+        this.handleEvents();
+        self = this;
+        setInterval(function() {
+            self.handleEvents()
+        }, 1000 / 30);
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    /// HandleEvents
+    /// Sends the stored events to the server. Recieves instructions from the 
+    /// server. Also increments the time and clears the stored events.
+    ////////////////////////////////////////////////////////////////////////////
+    handleEvents() {
+        const type = "POST";
+        const path = "/event/" + this.sessionKey;
+        const payload = {
+            events: this.events,
+            time: this.time
+        };
+    
+        // Send the POST request (blocking)
+        const response = this.sendRequest(type, path, payload);
+        console.log(response);
+        this.processInstructions(response);
+
+        
+        
+        this.time++;
+        this.events = [];
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    /// RegisterEventListeners
+    /// Adds the event listeners given in the array. 
+    /// Parameters
+    ///     listeners: Array[String]
+    ///         Names of the event listeners to add 
+    ///
+    /// TODO: Refresh event listeners if server changes which ones are used.
+    /// TODO: Add touch and controller events.
+    /// TODO: Make sure click events work if canvas is resized.
+    ////////////////////////////////////////////////////////////////////////////
+    registerEventListeners(listeners) {
+        if (listeners.includes("click")) {
+            this.canvas.addEventListener('click', (event) => {
+                this.events.push({
+                    type: event.type,
+                    x: event.clientX - this.canvas.getBoundingClientRect().left,
+                    y: event.clientY - this.canvas.getBoundingClientRect().top,
+                    ctrlKey: event.ctrlKey,
+                    altKey: event.altKey,
+                    metaKey: event.metaKey
+                });
+            });
+        }
+        
+        if (listeners.includes("keydown")) {
+            document.addEventListener('keydown', (event) => {
+                this.events.push({
+                    type: event.type,
+                    ctrlKey: event.ctrlKey,
+                    key: event.key,
+                    shiftKey: event.shiftKey,
+                    metaKey: event.metaKey
+                });
+            });
+        }
+    
+        if (listeners.includes("keyup")) {
+            document.addEventListener('keyup', (event) => {
+                this.events.push({
+                    type: event.type,
+                    ctrlKey: event.ctrlKey,
+                    key: event.key,
+                    shiftKey: event.shiftKey,
+                    metaKey: event.metaKey
+                });
+            });
+        }
+    
+        if (listeners.includes("dblclick")) {
+            this.canvas.addEventListener('dblclick', (event) => {
+                this.events.push({
+                    type: event.type,
+                    x: event.clientX - this.canvas.getBoundingClientRect().left,
+                    y: event.clientY - this.canvas.getBoundingClientRect().top,
+                    ctrlKey: event.ctrlKey,
+                    altKey: event.altKey,
+                    metaKey: event.metaKey
+                });
+            });
+        }
+    
+        if (listeners.includes("mousedown")) {
+            this.canvas.addEventListener('mousedown', (event) => {
+                this.events.push({
+                    type: event.type,
+                    x: event.clientX - this.canvas.getBoundingClientRect().left,
+                    y: event.clientY - this.canvas.getBoundingClientRect().top,
+                    ctrlKey: event.ctrlKey,
+                    altKey: event.altKey,
+                    metaKey: event.metaKey
+                });
+            });
+        }
+    
+        if (listeners.includes("mouseup")) {
+            this.canvas.addEventListener('mouseup', (event) => {
+                this.events.push({
+                    type: event.type,
+                    x: event.clientX - this.canvas.getBoundingClientRect().left,
+                    y: event.clientY - this.canvas.getBoundingClientRect().top,
+                    ctrlKey: event.ctrlKey,
+                    altKey: event.altKey,
+                    metaKey: event.metaKey
+                });
+            });
+        }
+    
+        if (listeners.includes("mousemove")) {
+            this.canvas.addEventListener('mousemove', (event) => {
+                this.events.push({
+                    type: event.type,
+                    x: event.clientX - this.canvas.getBoundingClientRect().left,
+                    y: event.clientY - this.canvas.getBoundingClientRect().top,
+                    ctrlKey: event.ctrlKey,
+                    altKey: event.altKey,
+                    metaKey: event.metaKey
+                });
+            });
+        }
+    
+        if (listeners.includes("resize")) {
+            window.addEventListener('resize', (event) => {
+                this.events.push({
+                    type: event.type,
+                    width: window.innerWidth,
+                    height: window.innerHeight,
+                    orientation: getOrientation()
+                });
+            });
+        }
+    
+        if (listeners.includes("beforeunload")) {
+            window.addEventListener('beforeunload', () => {
+                fetch("/disconnect/" + sessionKey)
+            });
+        }
     }
 }
 
-
-
-function eventLoop() {
-    console.log(advance());
-    window.requestAnimationFrame(eventLoop);
-    //setTimeout(eventLoop, 1000);
-}
-
+////////////////////////////////////////////////////////////////////////////////
+/// GetOrientation
+/// Gets the current orientation of the screen
+///
+/// Returns
+///     String
+///         PORTRAIT, LANDSCAPE, or UNKNOWN
+////////////////////////////////////////////////////////////////////////////////
 function getOrientation() {
     if (window.matchMedia("(orientation: portrait)").matches) {
         return "PORTRAIT"
@@ -66,181 +276,6 @@ function getOrientation() {
     return "UNKNOWN"
 }
 
-function addEventListeners(listeners) {
-    // Event Listeners for Mouse Events (Canvas with id "canvas")
-    const canvas = document.getElementById('myCanvas');
 
-    if (listeners.includes("click")) {
-        canvas.addEventListener('click', (event) => {
-            const canvas = document.getElementById("myCanvas");
-            events.push({
-                type: event.type,
-                x:  event.clientX - canvas.getBoundingClientRect().left,
-                y: event.clientY - canvas.getBoundingClientRect().top,
-                ctrlKey: event.ctrlKey,
-                altKey: event.altKey,
-                metaKey: event.metaKey
-            });
-        });
-    }
-    // 1. click
-    
-    document.addEventListener('keydown', (event) => {
-        console.log(event);
-    });
-    return;
-    // 2. dblclick
-    canvas.addEventListener('dblclick', (event) => {
-        console.log('Mouse Double-Clicked on Canvas');
-    });
-
-    // 3. mousedown
-    canvas.addEventListener('mousedown', (event) => {
-        console.log('Mouse Button Pressed Down on Canvas');
-    });
-
-    // 4. mouseup
-    canvas.addEventListener('mouseup', (event) => {
-        console.log('Mouse Button Released on Canvas');
-    });
-
-    // 7. mousemove (for canvas)
-    canvas.addEventListener('mousemove', (event) => {
-        console.log('Mouse Moved on Canvas');
-    });
-
-
-    // Event Listeners for Touch Events (Canvas with id "canvas")
-
-    // 21. touchstart (for canvas)
-    canvas.addEventListener('touchstart', (event) => {
-        console.log('Touch Started on Canvas');
-    });
-
-    // 22. touchmove (for canvas)
-    canvas.addEventListener('touchmove', (event) => {
-        console.log('Touch Moved on Canvas');
-    });
-
-    // 23. touchend (for canvas)
-    canvas.addEventListener('touchend', (event) => {
-        console.log('Touch Ended on Canvas');
-    });
-
-    // 24. touchcancel (for canvas)
-    canvas.addEventListener('touchcancel', (event) => {
-        console.log('Touch Canceled on Canvas');
-    });
-
-
-    // Event Listeners for Document (or appropriate elements)
-
-    // 8. keydown (for document)
-    document.addEventListener('keydown', (event) => {
-        console.log('Key Down: ' + event.key);
-    });
-
-    // 9. keyup (for document)
-    document.addEventListener('keyup', (event) => {
-        console.log('Key Up: ' + event.key);
-    });
-
-
-    // Event Listeners for Window
-
-    // 15. load (for window)
-    window.addEventListener('load', () => {
-        console.log('Window Loaded');
-    });
-
-    // 16. unload (for window)
-    window.addEventListener('unload', () => {
-        console.log('Window Unloaded');
-    });
-
-    // 17. resize (for window)
-    window.addEventListener('resize', () => {
-        console.log('Window Resized');
-    });
-
-}
-
-/**
- * Creates a connection to the CanvasStream server.
- */
-function setup() {
-    const path = "/setup/";
-    // Create a new XMLHttpRequest object
-    var xhr = new XMLHttpRequest();
-
-    // Configure the POST request
-    xhr.open('POST', path, false); // Set the third parameter to true for asynchronous
-
-    // Set the content type header
-    xhr.setRequestHeader('Content-Type', 'application/json');
-
-    // Data to be sent in the POST request (replace with your own data)
-    var postData = JSON.stringify({
-        width: window.innerWidth,
-        height: window.innerHeight,
-        orientation: getOrientation()
-    });
-
-    // Send the POST request (blocking)
-    xhr.send(postData);
-
-    // Check the response status
-    if (xhr.status === 200) {
-        // Request was successful
-        var responseText = xhr.responseText;
-        console.log('POST Response:', responseText);
-        return JSON.parse(responseText);
-    } else {
-        // Request failed
-        console.error('POST Request failed with status:', xhr.status);
-        return responseText;
-    }
-}
-
-function getContext() {
-    const ctx = document.getElementById("myCanvas").getContext("2d");
-    ctx.imageCache = {};
-
-    // ctx.drawImg = function(imagePath, dx, dy, dWidth = null, dHeight = null) {
-
-    //     if (!(imagePath in imageCache)) {
-    //         const newImage = new Image();
-    //         newImage.src = "/assets/" + imagePath;
-    //         this.imageCache[imagePath] = newImage;
-    //     }
-        
-    //     let args = [this.imageCache[imagePath], dx, dy];
-    //     if (dWidth != null && dHeight != null) {
-    //         args.push(dWidth);
-    //         args.push(dHeight);
-    //     }
-    
-    //     // Call the original drawImage method
-    //     ctx.drawImage.apply(ctx, args);
-    // };
-}
-
-function draw(drawCommands) {
-    const ctx = document.getElementById("myCanvas").getContext("2d");
-    for (const message of drawCommands) {
-        console.log(message);
-        const type = message.type;
-        const name = message.name;
-        const parameters = message.parameters;
-
-        if (type == "func") {
-            ctx[name].apply(ctx, parameters);
-        } else if (type == "var") {
-            ctx[name] = parameters[0];
-        } else if (type == "command") {
-
-        }
-    }
-}
-
-main();
+// Start Execution
+new Main();
