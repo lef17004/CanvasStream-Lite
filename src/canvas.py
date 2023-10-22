@@ -4,6 +4,9 @@ class Canvas:
     """
     Canvas
     Class that mimics the browser's javascript canvas api.
+
+    Citation
+        https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D
     """
     def __init__(self):
         """
